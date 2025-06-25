@@ -45,6 +45,8 @@ async function createBooking(data) {
 async function makePayment(data) {
   const transaction = await db.sequelize.transaction();
   try {
+    console.log("INSIDE MAKE PAYMENET");
+
     const bookingDetails = await bookingRepository.get(
       data.bookingId,
       transaction
@@ -58,12 +60,12 @@ async function makePayment(data) {
     const currentTime = new Date();
 
     if (currentTime - bookingTime > 300000) {
-      const response = await bookingRepository.update(data.bookingId, {
-        status: CANCELLED,
-        transaction,
-      });
+      await cancelBooking(data.bookingId);
       throw new AppError("The Booking is Expired", StatusCodes.BAD_REQUEST);
     }
+
+    console.log("bookingDetails.totalCost", bookingDetails.totalCost);
+    console.log("data.totalCost", data.totalCost);
 
     if (bookingDetails.totalCost !== data.totalCost) {
       throw new AppError(
@@ -87,7 +89,47 @@ async function makePayment(data) {
     await transaction.commit();
   } catch (error) {
     await transaction.rollback();
-    throw error;
+    throw new AppError(
+      "Something went wrong in Payment",
+      StatusCodes.INTERNAL_SERVER_ERROR
+    );
+  }
+}
+
+async function cancelBooking(bookingId) {
+  const transaction = await db.sequelize.transaction();
+  try {
+    const bookingDetails = await bookingRepository.get(bookingId, transaction);
+
+    if (bookingDetails.status == CANCELLED) {
+      await transaction.commit();
+      return true;
+    }
+
+    console.log("HIEEE");
+
+    await axios.patch(
+      `${ServerConfig.FLIGHT_SERVICE}/api/v1/flights/${bookingDetails.flightId}/seats`,
+      {
+        seats: bookingDetails.noOfSeats,
+        decrement: 0,
+      }
+    );
+
+    console.log("HIEEE2");
+
+    await bookingRepository.update(bookingId, {
+      status: CANCELLED,
+      transaction,
+    });
+
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw new AppError(
+      "Something went wrong in Payment",
+      StatusCodes.INTERNAL_SERVER_ERROR
+    );
   }
 }
 
