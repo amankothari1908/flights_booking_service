@@ -45,8 +45,6 @@ async function createBooking(data) {
 async function makePayment(data) {
   const transaction = await db.sequelize.transaction();
   try {
-    console.log("INSIDE MAKE PAYMENET");
-
     const bookingDetails = await bookingRepository.get(
       data.bookingId,
       transaction
@@ -63,9 +61,6 @@ async function makePayment(data) {
       await cancelBooking(data.bookingId);
       throw new AppError("The Booking is Expired", StatusCodes.BAD_REQUEST);
     }
-
-    console.log("bookingDetails.totalCost", bookingDetails.totalCost);
-    console.log("data.totalCost", data.totalCost);
 
     if (bookingDetails.totalCost !== data.totalCost) {
       throw new AppError(
@@ -106,8 +101,6 @@ async function cancelBooking(bookingId) {
       return true;
     }
 
-    console.log("HIEEE");
-
     await axios.patch(
       `${ServerConfig.FLIGHT_SERVICE}/api/v1/flights/${bookingDetails.flightId}/seats`,
       {
@@ -115,8 +108,6 @@ async function cancelBooking(bookingId) {
         decrement: 0,
       }
     );
-
-    console.log("HIEEE2");
 
     await bookingRepository.update(bookingId, {
       status: CANCELLED,
